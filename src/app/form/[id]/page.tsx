@@ -173,10 +173,18 @@ export default function DynamicFormPage({ params }: { params: Promise<{ id: stri
         const parentAnswer = answers[question.parentQuestionId]
         if (parentAnswer) {
           const conditionalValues = JSON.parse(question.conditionalValues)
-          const parentValue = parentAnswer.value
+          let shouldShow = false
           
-          // Check if parent value matches any conditional value
-          if (conditionalValues.includes(parentValue)) {
+          // Handle different question types
+          if (Array.isArray(parentAnswer.value)) {
+            // For checkbox (multiple values)
+            shouldShow = parentAnswer.value.some(value => conditionalValues.includes(value))
+          } else {
+            // For radio, select, text (single value)
+            shouldShow = conditionalValues.includes(parentAnswer.value)
+          }
+          
+          if (shouldShow) {
             newVisibleQuestions.add(question.id)
           }
         }
