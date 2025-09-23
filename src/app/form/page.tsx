@@ -9,14 +9,11 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import Image from 'next/image'
 import { 
-  Stethoscope, 
   Search,
   ArrowRight,
   ChevronRight,
   FileText,
-  Settings,
-  Clock,
-  Users
+  Settings
 } from 'lucide-react'
 
 interface Symptom {
