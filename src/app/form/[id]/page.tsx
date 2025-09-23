@@ -262,7 +262,7 @@ export default function DynamicFormPage({ params }: { params: Promise<{ id: stri
                       answer.value.includes(opt.id)
                     ) || []
                     
-                    if (selectedOptions.length === 0) return ''
+                    if (selectedOptions.length === 0) return '__SKIP_TEMPLATE__'
                     
                     // Process each selected option
                     const labels = selectedOptions.map(option => {
@@ -384,7 +384,7 @@ export default function DynamicFormPage({ params }: { params: Promise<{ id: stri
                       answer.value.includes(opt.id)
                     ) || []
                     
-                    if (selectedOptions.length === 0) return ''
+                    if (selectedOptions.length === 0) return '__SKIP_TEMPLATE__'
                     
                     // Process each selected option
                     const labels = selectedOptions.map(option => {

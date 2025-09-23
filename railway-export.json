@@ -1,0 +1,229 @@
+{
+  "admins": [
+    {
+      "id": 1,
+      "username": "admin",
+      "password": "$2b$12$qMxFmG7w.g1HJq86wTI1quQz7ol59ye1sKjZfklJRN9Cspm/LZlw2",
+      "name": "Administrator",
+      "createdAt": "2025-09-23T12:40:13.998Z",
+      "updatedAt": "2025-09-23T12:40:13.998Z"
+    }
+  ],
+  "symptoms": [
+    {
+      "id": 1,
+      "name": "ไข้ ไอ เจ็บคอ",
+      "description": "",
+      "isActive": true,
+      "order": 1,
+      "createdAt": "2025-09-23T12:43:13.467Z",
+      "updatedAt": "2025-09-23T12:43:13.467Z",
+      "questions": [
+        {
+          "id": 3,
+          "symptomId": 1,
+          "title": "เพศของผู้ป่วย",
+          "description": "",
+          "type": "radio",
+          "isRequired": false,
+          "isGeneral": false,
+          "isCC": false,
+          "hasTimeUnit": false,
+          "order": 1,
+          "parentQuestionId": null,
+          "conditionalValues": null,
+          "isActive": true,
+          "createdAt": "2025-09-23T18:31:05.943Z",
+          "updatedAt": "2025-09-23T18:31:05.943Z",
+          "options": [
+            {
+              "id": 7,
+              "questionId": 3,
+              "label": "ชาย",
+              "value": "male",
+              "order": 1,
+              "hasInput": false,
+              "isActive": true
+            },
+            {
+              "id": 8,
+              "questionId": 3,
+              "label": "หญิง",
+              "value": "female",
+              "order": 2,
+              "hasInput": false,
+              "isActive": true
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "symptomId": 1,
+          "title": "เป็นมาแล้วกี่วัน",
+          "description": "",
+          "type": "number",
+          "isRequired": false,
+          "isGeneral": false,
+          "isCC": false,
+          "hasTimeUnit": true,
+          "order": 4,
+          "parentQuestionId": null,
+          "conditionalValues": null,
+          "isActive": true,
+          "createdAt": "2025-09-23T18:36:25.100Z",
+          "updatedAt": "2025-09-23T18:36:25.100Z",
+          "options": []
+        },
+        {
+          "id": 9,
+          "symptomId": 1,
+          "title": "ลักษณะของไข้",
+          "description": "",
+          "type": "radio",
+          "isRequired": false,
+          "isGeneral": false,
+          "isCC": false,
+          "hasTimeUnit": false,
+          "order": 5,
+          "parentQuestionId": 8,
+          "conditionalValues": "\"[\\\"fever\\\"]\"",
+          "isActive": true,
+          "createdAt": "2025-09-23T18:54:41.431Z",
+          "updatedAt": "2025-09-23T18:54:41.431Z",
+          "options": [
+            {
+              "id": 41,
+              "questionId": 9,
+              "label": "ไข้ต่ำ ๆ",
+              "value": "low",
+              "order": 1,
+              "hasInput": false,
+              "isActive": true
+            },
+            {
+              "id": 42,
+              "questionId": 9,
+              "label": "ไข้สูง",
+              "value": "high",
+              "order": 2,
+              "hasInput": false,
+              "isActive": true
+            }
+          ]
+        },
+        {
+          "id": 8,
+          "symptomId": 1,
+          "title": "อาการที่นำมา",
+          "description": "",
+          "type": "checkbox",
+          "isRequired": false,
+          "isGeneral": false,
+          "isCC": false,
+          "hasTimeUnit": false,
+          "order": 3,
+          "parentQuestionId": null,
+          "conditionalValues": null,
+          "isActive": true,
+          "createdAt": "2025-09-23T18:41:48.601Z",
+          "updatedAt": "2025-09-23T18:56:34.150Z",
+          "options": [
+            {
+              "id": 43,
+              "questionId": 8,
+              "label": "ไข้",
+              "value": "fever",
+              "order": 1,
+              "hasInput": false,
+              "isActive": true
+            },
+            {
+              "id": 44,
+              "questionId": 8,
+              "label": "ไอ",
+              "value": "cough",
+              "order": 2,
+              "hasInput": false,
+              "isActive": true
+            },
+            {
+              "id": 45,
+              "questionId": 8,
+              "label": "เจ็บคอ",
+              "value": "sore_throat",
+              "order": 3,
+              "hasInput": false,
+              "isActive": true
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "symptomId": 1,
+          "title": "อายุของผู้ป่วย",
+          "description": "",
+          "type": "number",
+          "isRequired": false,
+          "isGeneral": false,
+          "isCC": false,
+          "hasTimeUnit": false,
+          "order": 2,
+          "parentQuestionId": 3,
+          "conditionalValues": "\"[\\\"male\\\"]\"",
+          "isActive": true,
+          "createdAt": "2025-09-23T18:32:17.636Z",
+          "updatedAt": "2025-09-23T19:09:11.015Z",
+          "options": []
+        }
+      ],
+      "textTemplates": [
+        {
+          "id": 2,
+          "symptomId": 1,
+          "questionId": 3,
+          "triggerValue": "",
+          "template": "ผู้ป่วย{label}ไทย",
+          "order": 1,
+          "isActive": true,
+          "createdAt": "2025-09-23T18:31:49.540Z",
+          "updatedAt": "2025-09-23T18:31:49.540Z"
+        },
+        {
+          "id": 3,
+          "symptomId": 1,
+          "questionId": 4,
+          "triggerValue": "",
+          "template": "อายุ {value} ปี",
+          "order": 2,
+          "isActive": true,
+          "createdAt": "2025-09-23T18:32:45.437Z",
+          "updatedAt": "2025-09-23T18:32:45.437Z"
+        },
+        {
+          "id": 5,
+          "symptomId": 1,
+          "questionId": 6,
+          "triggerValue": "",
+          "template": "{value}",
+          "order": 4,
+          "isActive": true,
+          "createdAt": "2025-09-23T18:37:05.184Z",
+          "updatedAt": "2025-09-23T18:37:05.184Z"
+        },
+        {
+          "id": 8,
+          "symptomId": 1,
+          "questionId": 8,
+          "triggerValue": "",
+          "template": "มีอาการ{label}",
+          "order": 6,
+          "isActive": true,
+          "createdAt": "2025-09-23T18:56:56.882Z",
+          "updatedAt": "2025-09-23T18:56:56.882Z"
+        }
+      ]
+    }
+  ],
+  "submissions": [],
+  "exportDate": "2025-09-23T19:14:58.937Z"
+}
