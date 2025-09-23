@@ -124,7 +124,7 @@ export async function POST(
     // Create options if provided
     if (options && Array.isArray(options) && options.length > 0) {
       console.log('Creating options:', options)
-      const optionsData = options.map((option: any, index: number) => ({
+      const optionsData = options.map((option: { label: string; value: string; order?: number; hasInput?: boolean }, index: number) => ({
         questionId: question.id,
         label: option.label,
         value: option.value,

@@ -54,7 +54,7 @@ export async function PUT(
       // Create new options
       if (options.length > 0) {
         await prisma.questionOption.createMany({
-          data: options.map((option: any, index: number) => ({
+          data: options.map((option: { label: string; value: string; order?: number; hasInput?: boolean }, index: number) => ({
             questionId,
             label: option.label,
             value: option.value,

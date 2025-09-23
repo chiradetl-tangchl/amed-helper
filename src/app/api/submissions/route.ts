@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     })
 
     // Create user answers
-    const answerPromises = answers.map((answer: any) => {
+    const answerPromises = answers.map((answer: { questionId: number; optionId?: number; textValue?: string }) => {
       const optionInputKey = `${answer.questionId}-${answer.optionId}`
       return prisma.userAnswer.create({
         data: {

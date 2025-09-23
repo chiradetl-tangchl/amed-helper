@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -75,13 +75,23 @@ export default function QuestionsPage({ params }: { params: Promise<{ id: string
     options: [] as { label: string, value: string, order: number, hasInput?: boolean }[]
   })
   const router = useRouter()
-  const symptomId = parseInt(use(params).id)
+  const [symptomId, setSymptomId] = useState<number | null>(null)
 
   useEffect(() => {
-    fetchQuestionsData()
+    params.then((resolvedParams) => {
+      setSymptomId(parseInt(resolvedParams.id))
+    })
+  }, [params])
+
+  useEffect(() => {
+    if (symptomId) {
+      fetchQuestionsData()
+    }
   }, [symptomId])
 
   const fetchQuestionsData = async () => {
+    if (!symptomId) return
+    
     try {
       const response = await fetch(`/api/admin/symptoms/${symptomId}/questions`)
       if (response.ok) {
@@ -132,7 +142,7 @@ export default function QuestionsPage({ params }: { params: Promise<{ id: string
           if (!question.conditionalValues) return []
           try {
             // Handle double-encoded JSON
-            let value = question.conditionalValues
+            const value = question.conditionalValues
             let parsed = JSON.parse(value)
             
             // If result is still a string, try parsing again (double-encoded)
@@ -181,7 +191,7 @@ export default function QuestionsPage({ params }: { params: Promise<{ id: string
         body: JSON.stringify({
           ...formData,
           conditionalValues: formData.conditionalValues.length > 0 ? JSON.stringify(formData.conditionalValues) : null,
-          parentQuestionId: formData.parentQuestionId === 'none' ? null : formData.parentQuestionId
+          parentQuestionId: formData.parentQuestionId
         })
       })
 
@@ -476,7 +486,7 @@ export default function QuestionsPage({ params }: { params: Promise<{ id: string
                       
                       {formData.options.length === 0 && (
                         <div className="text-center py-8 text-gray-500">
-                          ยังไม่มีตัวเลือก คลิก "เพิ่มตัวเลือก" เพื่อเริ่มต้น
+                          ยังไม่มีตัวเลือก คลิก &quot;เพิ่มตัวเลือก&quot; เพื่อเริ่มต้น
                         </div>
                       )}
                     </div>

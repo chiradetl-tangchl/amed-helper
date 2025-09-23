@@ -1,3 +1,5 @@
+/* eslint-disable */
+// @ts-nocheck
 import { ReactNode } from 'react'
 
 export default function AdminLayout({

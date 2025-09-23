@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -75,7 +75,7 @@ const QUESTION_TYPES = [
   { value: 'number', label: 'ตัวเลข (Number)' }
 ]
 
-export default function QuestionsPage({ params }: { params: { id: string } }) {
+export default function QuestionsPage({ params }: { params: Promise<{ id: string }> }) {
   const [symptom, setSymptom] = useState<Symptom | null>(null)
   const [questions, setQuestions] = useState<Question[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -93,13 +93,23 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
     options: [] as { label: string, value: string, order: number }[]
   })
   const router = useRouter()
-  const symptomId = parseInt(use(params).id)
+  const [symptomId, setSymptomId] = useState<number | null>(null)
 
   useEffect(() => {
-    fetchQuestionsData()
+    params.then((resolvedParams) => {
+      setSymptomId(parseInt(resolvedParams.id))
+    })
+  }, [params])
+
+  useEffect(() => {
+    if (symptomId) {
+      fetchQuestionsData()
+    }
   }, [symptomId])
 
   const fetchQuestionsData = async () => {
+    if (!symptomId) return
+    
     try {
       const response = await fetch(`/api/admin/symptoms/${symptomId}/questions`)
       if (response.ok) {
@@ -322,7 +332,7 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
                 {editingQuestion ? 'แก้ไขคำถาม' : 'เพิ่มคำถามใหม่'}
               </DialogTitle>
               <DialogDescription>
-                ออกแบบคำถามสำหรับอาการ "{symptom.name}"
+                ออกแบบคำถามสำหรับอาการ &quot;{symptom?.name}&quot;
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -563,7 +573,7 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
         <CardHeader>
           <CardTitle>รายการคำถาม</CardTitle>
           <CardDescription>
-            จัดการคำถามสำหรับอาการ "{symptom.name}"
+            จัดการคำถามสำหรับอาการ &quot;{symptom?.name}&quot;
           </CardDescription>
         </CardHeader>
         <CardContent>
