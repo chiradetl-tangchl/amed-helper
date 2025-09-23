@@ -179,11 +179,21 @@ export default function DynamicFormPage({ params }: { params: Promise<{ id: stri
           
           // Handle different question types
           if (Array.isArray(parentAnswer.value)) {
-            // For checkbox (multiple values)
-            shouldShow = parentAnswer.value.some(value => conditionalValues.includes(value))
+            // For checkbox (multiple values) - need to convert option IDs to values
+            const parentQuestion = symptom.questions.find(q => q.id === question.parentQuestionId)
+            if (parentQuestion) {
+              shouldShow = parentAnswer.value.some(optionId => {
+                const selectedOption = parentQuestion.options?.find(opt => opt.id === optionId)
+                if (selectedOption) {
+                  // Compare option.value only (like radio does)
+                  return conditionalValues.includes(selectedOption.value)
+                }
+                return false
+              })
+            }
             console.log(`Checkbox check: ${parentAnswer.value} vs ${conditionalValues} = ${shouldShow}`)
           } else {
-            // For radio, select, text (single value)
+            // For radio, select, text (single value) - works as before
             shouldShow = conditionalValues.includes(parentAnswer.value)
             console.log(`Single value check: ${parentAnswer.value} vs ${conditionalValues} = ${shouldShow}`)
           }
