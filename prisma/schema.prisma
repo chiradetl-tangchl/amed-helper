@@ -1,0 +1,148 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// Admin user model
+model Admin {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  password  String   // Hash password
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Symptoms/Diseases model
+model Symptom {
+  id               Int               @id @default(autoincrement())
+  name             String
+  description      String?
+  isActive         Boolean           @default(true)
+  order            Int               @default(0)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  questions        Question[]
+  textTemplates    TextTemplate[]
+  userSubmissions  UserSubmission[]
+}
+
+// Question types: radio, checkbox, select, text, number
+model Question {
+  id              Int             @id @default(autoincrement())
+  symptomId       Int
+  symptom         Symptom         @relation(fields: [symptomId], references: [id], onDelete: Cascade)
+  
+  title           String
+  description     String?
+  type            String          // "radio", "checkbox", "select", "text", "number"
+  isRequired      Boolean         @default(false)
+  isGeneral       Boolean         @default(false) // true for general questions like drug allergies
+  isCC            Boolean         @default(false) // true for Chief Complaint questions
+  hasTimeUnit     Boolean         @default(false) // true for number questions with time units
+  order           Int             @default(0)
+  
+  // Conditional logic
+  parentQuestionId Int?
+  parentQuestion   Question?       @relation("QuestionHierarchy", fields: [parentQuestionId], references: [id])
+  childQuestions   Question[]      @relation("QuestionHierarchy")
+  
+  // Show this question only if parent question has specific values
+  conditionalValues String?        // JSON array of values that trigger this question
+  
+  isActive        Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  
+  options         QuestionOption[]
+  userAnswers     UserAnswer[]
+  textTemplates   TextTemplate[]
+}
+
+// Options for radio, checkbox, select questions
+model QuestionOption {
+  id          Int           @id @default(autoincrement())
+  questionId  Int
+  question    Question      @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  
+  label       String
+  value       String
+  order       Int           @default(0)
+  hasInput    Boolean       @default(false)  // true if this option should show an input field
+  isActive    Boolean       @default(true)
+  
+  userAnswers UserAnswer[]
+}
+
+// Text templates for generating summaries
+model TextTemplate {
+  id              Int      @id @default(autoincrement())
+  symptomId       Int?
+  symptom         Symptom? @relation(fields: [symptomId], references: [id], onDelete: Cascade)
+  questionId      Int?
+  question        Question? @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  
+  // Template conditions
+  triggerValue    String?  // Value that triggers this template
+  
+  // Template text with placeholders
+  template        String   // e.g., "มีประวัติแพ้ยา {allergyName}" or "ไม่มีประวัติแพ้ยา"
+  
+  order           Int      @default(0)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// User submissions (anonymous users)
+model UserSubmission {
+  id           String       @id @default(cuid())
+  symptomId    Int
+  symptom      Symptom      @relation(fields: [symptomId], references: [id])
+  
+  // Generated summary text
+  summaryText  String
+  
+  // Time units data (JSON)
+  timeUnits    String?
+  
+  createdAt    DateTime     @default(now())
+  userAnswers  UserAnswer[]
+}
+
+// User answers to questions
+model UserAnswer {
+  id               Int             @id @default(autoincrement())
+  userSubmissionId String
+  userSubmission   UserSubmission  @relation(fields: [userSubmissionId], references: [id], onDelete: Cascade)
+  
+  questionId       Int
+  question         Question        @relation(fields: [questionId], references: [id])
+  
+  // For radio/select: optionId will be set
+  optionId         Int?
+  option           QuestionOption? @relation(fields: [optionId], references: [id])
+  
+  // For text/number: textValue will be set
+  textValue        String?
+  
+  // For "other" option: additional text specified by user
+  otherText        String?
+  
+  // For options with hasInput=true: input text for that specific option
+  optionInput      String?
+  
+  // For checkbox: multiple records with same questionId, different optionId
+  
+  createdAt        DateTime        @default(now())
+  
+  @@unique([userSubmissionId, questionId, optionId])
+}
