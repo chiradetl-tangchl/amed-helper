@@ -29,91 +29,83 @@ export async function POST(
       return NextResponse.json({ error: 'Symptom not found' }, { status: 404 })
     }
 
-    // Create new symptom (copy)
+    // Step 1: Create new symptom (without nested relations)
     const newSymptom = await prisma.symptom.create({
       data: {
         name: `${originalSymptom.name} (สำเนา)`,
         description: originalSymptom.description,
         isActive: false, // Start as inactive
         order: (await prisma.symptom.count()) + 1, // Put at the end
-        questions: {
-          create: originalSymptom.questions.map(question => ({
-            title: question.title,
-            description: question.description,
-            type: question.type,
-            isRequired: question.isRequired,
-            isGeneral: question.isGeneral,
-            isCC: question.isCC,
-            hasTimeUnit: question.hasTimeUnit,
-            parentQuestionId: null, // Will be updated later for conditional questions
-            conditionalValues: question.conditionalValues,
-            order: question.order,
-            options: {
-              create: question.options.map(option => ({
-                label: option.label,
-                value: option.value,
-                hasInput: option.hasInput,
-                order: option.order,
-                isActive: option.isActive
-              }))
-            }
-          }))
-        },
-        textTemplates: {
-          create: originalSymptom.textTemplates.map(template => ({
-            questionId: null, // Will be updated later
-            triggerValue: template.triggerValue,
-            template: template.template,
-            order: template.order
-          }))
-        }
-      },
-      include: {
-        questions: {
-          include: {
-            options: true
-          }
-        },
-        textTemplates: true
       }
     })
 
-    // Now update parent question relationships and template question references
+    // Step 2: Create questions (without parent relationships yet)
     const questionIdMapping: { [oldId: number]: number } = {}
     
-    // Create mapping of old question IDs to new question IDs
-    originalSymptom.questions.forEach((originalQuestion, index) => {
-      questionIdMapping[originalQuestion.id] = newSymptom.questions[index].id
-    })
-
-    // Update parent question relationships for conditional questions
-    for (let i = 0; i < originalSymptom.questions.length; i++) {
-      const originalQuestion = originalSymptom.questions[i]
-      const newQuestion = newSymptom.questions[i]
+    for (const originalQuestion of originalSymptom.questions) {
+      const newQuestion = await prisma.question.create({
+        data: {
+          symptomId: newSymptom.id,
+          title: originalQuestion.title,
+          description: originalQuestion.description,
+          type: originalQuestion.type,
+          isRequired: originalQuestion.isRequired,
+          isGeneral: originalQuestion.isGeneral,
+          isCC: originalQuestion.isCC,
+          hasTimeUnit: originalQuestion.hasTimeUnit,
+          parentQuestionId: null, // Will be updated later
+          conditionalValues: originalQuestion.conditionalValues,
+          order: originalQuestion.order
+        }
+      })
       
-      if (originalQuestion.parentQuestionId && questionIdMapping[originalQuestion.parentQuestionId]) {
-        await prisma.question.update({
-          where: { id: newQuestion.id },
+      questionIdMapping[originalQuestion.id] = newQuestion.id
+      
+      // Step 3: Create options for each question
+      for (const originalOption of originalQuestion.options) {
+        await prisma.questionOption.create({
           data: {
-            parentQuestionId: questionIdMapping[originalQuestion.parentQuestionId]
+            questionId: newQuestion.id,
+            label: originalOption.label,
+            value: originalOption.value,
+            hasInput: originalOption.hasInput,
+            order: originalOption.order,
+            isActive: originalOption.isActive
           }
         })
       }
     }
 
-    // Update text template question references
-    for (let i = 0; i < originalSymptom.textTemplates.length; i++) {
-      const originalTemplate = originalSymptom.textTemplates[i]
-      const newTemplate = newSymptom.textTemplates[i]
-      
-      if (originalTemplate.questionId && questionIdMapping[originalTemplate.questionId]) {
-        await prisma.textTemplate.update({
-          where: { id: newTemplate.id },
+    // Step 4: Update parent question relationships
+    for (const originalQuestion of originalSymptom.questions) {
+      if (originalQuestion.parentQuestionId && questionIdMapping[originalQuestion.parentQuestionId]) {
+        const newQuestionId = questionIdMapping[originalQuestion.id]
+        const newParentQuestionId = questionIdMapping[originalQuestion.parentQuestionId]
+        
+        await prisma.question.update({
+          where: { id: newQuestionId },
           data: {
-            questionId: questionIdMapping[originalTemplate.questionId]
+            parentQuestionId: newParentQuestionId
           }
         })
       }
+    }
+
+    // Step 5: Create text templates
+    for (const originalTemplate of originalSymptom.textTemplates) {
+      const questionId = originalTemplate.questionId && questionIdMapping[originalTemplate.questionId] 
+        ? questionIdMapping[originalTemplate.questionId] 
+        : null
+
+      await prisma.textTemplate.create({
+        data: {
+          symptomId: newSymptom.id,
+          questionId: questionId,
+          triggerValue: originalTemplate.triggerValue,
+          template: originalTemplate.template,
+          order: originalTemplate.order
+        }
+      })
     }
 
     return NextResponse.json({ 
