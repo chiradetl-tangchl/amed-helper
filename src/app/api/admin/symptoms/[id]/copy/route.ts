@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 
 export async function POST(
@@ -28,6 +29,14 @@ export async function POST(
     if (!originalSymptom) {
       return NextResponse.json({ error: 'Symptom not found' }, { status: 404 })
     }
+
+    // Ensure sequences for questions and options are synced with max IDs to avoid duplication errors
+    await prisma.$executeRaw(
+      Prisma.sql`SELECT setval(pg_get_serial_sequence('"Question"', 'id'), COALESCE((SELECT MAX(id) FROM "Question"), 0))`
+    )
+    await prisma.$executeRaw(
+      Prisma.sql`SELECT setval(pg_get_serial_sequence('"QuestionOption"', 'id'), COALESCE((SELECT MAX(id) FROM "QuestionOption"), 0))`
+    )
 
     // Step 1: Create new symptom (without nested relations)
     const newSymptom = await prisma.symptom.create({
