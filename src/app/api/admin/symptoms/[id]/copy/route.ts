@@ -43,19 +43,14 @@ export async function POST(
     const questionIdMapping: { [oldId: number]: number } = {}
     
     for (const originalQuestion of originalSymptom.questions) {
+      // Create new question data without id and relations (let Prisma auto-generate)
+      const { id, createdAt, updatedAt, symptomId, parentQuestionId, options, ...questionData } = originalQuestion
+      
       const newQuestion = await prisma.question.create({
         data: {
+          ...questionData,
           symptomId: newSymptom.id,
-          title: originalQuestion.title,
-          description: originalQuestion.description,
-          type: originalQuestion.type,
-          isRequired: originalQuestion.isRequired,
-          isGeneral: originalQuestion.isGeneral,
-          isCC: originalQuestion.isCC,
-          hasTimeUnit: originalQuestion.hasTimeUnit,
           parentQuestionId: null, // Will be updated later
-          conditionalValues: originalQuestion.conditionalValues,
-          order: originalQuestion.order
         }
       })
       
@@ -63,14 +58,13 @@ export async function POST(
       
       // Step 3: Create options for each question
       for (const originalOption of originalQuestion.options) {
+        // Create new option data without id field (let Prisma auto-generate)
+        const { id, questionId, ...optionData } = originalOption
+        
         await prisma.questionOption.create({
           data: {
+            ...optionData,
             questionId: newQuestion.id,
-            label: originalOption.label,
-            value: originalOption.value,
-            hasInput: originalOption.hasInput,
-            order: originalOption.order,
-            isActive: originalOption.isActive
           }
         })
       }
