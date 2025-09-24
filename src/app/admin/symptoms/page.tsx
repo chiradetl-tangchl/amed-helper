@@ -21,7 +21,8 @@ import {
   FileText,
   Users,
   Eye,
-  EyeOff
+  EyeOff,
+  Copy
 } from 'lucide-react'
 import Swal from 'sweetalert2'
 
@@ -169,6 +170,38 @@ export default function SymptomsPage() {
       } catch (error) {
         console.error('Delete symptom error:', error)
         Swal.fire('เกิดข้อผิดพลาด', 'ไม่สามารถลบข้อมูลได้', 'error')
+      }
+    }
+  }
+
+  const copySymptom = async (symptom: Symptom) => {
+    const result = await Swal.fire({
+      title: 'ทำสำเนาอาการ',
+      text: `คุณต้องการทำสำเนาของ "${symptom.name}" หรือไม่?`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#3085d6',
+      cancelButtonColor: '#d33',
+      confirmButtonText: 'ทำสำเนา',
+      cancelButtonText: 'ยกเลิก'
+    })
+
+    if (result.isConfirmed) {
+      try {
+        const response = await fetch(`/api/admin/symptoms/${symptom.id}/copy`, {
+          method: 'POST'
+        })
+
+        if (response.ok) {
+          await fetchSymptoms()
+          Swal.fire('ทำสำเนาเรียบร้อย!', 'สร้างสำเนาอาการใหม่แล้ว', 'success')
+        } else {
+          const data = await response.json()
+          Swal.fire('เกิดข้อผิดพลาด', data.error || 'ไม่สามารถทำสำเนาได้', 'error')
+        }
+      } catch (error) {
+        console.error('Copy symptom error:', error)
+        Swal.fire('เกิดข้อผิดพลาด', 'ไม่สามารถทำสำเนาได้', 'error')
       }
     }
   }
@@ -414,6 +447,14 @@ export default function SymptomsPage() {
                             onClick={() => openDialog(symptom)}
                           >
                             <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => copySymptom(symptom)}
+                            title="ทำสำเนา"
+                          >
+                            <Copy className="h-4 w-4" />
                           </Button>
                           <Button
                             size="sm"
