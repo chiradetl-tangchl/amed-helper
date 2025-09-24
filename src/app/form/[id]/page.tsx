@@ -116,6 +116,66 @@ export default function DynamicFormPage({ params }: { params: Promise<{ id: stri
     updateVisibleQuestions()
   }, [answers, symptom])
 
+  // Clean up answers for hidden questions
+  useEffect(() => {
+    if (!symptom) return
+    
+    setAnswers(prevAnswers => {
+      const cleanedAnswers = { ...prevAnswers }
+      let hasChanges = false
+      
+      Object.keys(cleanedAnswers).forEach(questionIdStr => {
+        const questionId = parseInt(questionIdStr)
+        if (!visibleQuestions.has(questionId)) {
+          delete cleanedAnswers[questionId]
+          hasChanges = true
+        }
+      })
+      
+      return hasChanges ? cleanedAnswers : prevAnswers
+    })
+    
+    // Clean up other states
+    setOtherTexts(prev => {
+      const newOtherTexts = { ...prev }
+      let hasChanges = false
+      Object.keys(newOtherTexts).forEach(questionIdStr => {
+        const questionId = parseInt(questionIdStr)
+        if (!visibleQuestions.has(questionId)) {
+          delete newOtherTexts[questionId]
+          hasChanges = true
+        }
+      })
+      return hasChanges ? newOtherTexts : prev
+    })
+    
+    setTimeUnits(prev => {
+      const newTimeUnits = { ...prev }
+      let hasChanges = false
+      Object.keys(newTimeUnits).forEach(questionIdStr => {
+        const questionId = parseInt(questionIdStr)
+        if (!visibleQuestions.has(questionId)) {
+          delete newTimeUnits[questionId]
+          hasChanges = true
+        }
+      })
+      return hasChanges ? newTimeUnits : prev
+    })
+    
+    setOptionInputs(prev => {
+      const newOptionInputs = { ...prev }
+      let hasChanges = false
+      Object.keys(newOptionInputs).forEach(key => {
+        const questionId = parseInt(key.split('-')[0])
+        if (!visibleQuestions.has(questionId)) {
+          delete newOptionInputs[key]
+          hasChanges = true
+        }
+      })
+      return hasChanges ? newOptionInputs : prev
+    })
+  }, [visibleQuestions, symptom])
+
   useEffect(() => {
     generateSummary()
   }, [answers, symptom, timeUnits, otherTexts, optionInputs])
@@ -199,45 +259,6 @@ export default function DynamicFormPage({ params }: { params: Promise<{ id: stri
           }
         }
       }
-    })
-
-    // Clean up answers for hidden questions
-    setAnswers(prevAnswers => {
-      const cleanedAnswers = { ...prevAnswers }
-      
-      Object.keys(cleanedAnswers).forEach(questionIdStr => {
-        const questionId = parseInt(questionIdStr)
-        if (!newVisibleQuestions.has(questionId)) {
-          // Remove answer for hidden question
-          delete cleanedAnswers[questionId]
-          
-          // Also clean up related UI state
-          setOtherTexts(prev => {
-            const newOtherTexts = { ...prev }
-            delete newOtherTexts[questionId]
-            return newOtherTexts
-          })
-          
-          setTimeUnits(prev => {
-            const newTimeUnits = { ...prev }
-            delete newTimeUnits[questionId]
-            return newTimeUnits
-          })
-          
-          // Clean up option inputs for this question
-          setOptionInputs(prev => {
-            const newOptionInputs = { ...prev }
-            Object.keys(newOptionInputs).forEach(key => {
-              if (key.startsWith(`${questionId}-`)) {
-                delete newOptionInputs[key]
-              }
-            })
-            return newOptionInputs
-          })
-        }
-      })
-      
-      return cleanedAnswers
     })
 
     setVisibleQuestions(newVisibleQuestions)
