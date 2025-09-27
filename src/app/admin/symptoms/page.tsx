@@ -1,13 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { 
@@ -19,7 +18,6 @@ import {
   X,
   MessageSquare,
   FileText,
-  Users,
   Eye,
   EyeOff,
   Copy,
@@ -75,7 +73,7 @@ function SortableRow({
   onDelete: (symptom: Symptom) => void
   onCopy: (symptom: Symptom) => void
   onToggleActive: (symptom: Symptom) => void
-  router: any
+  router: ReturnType<typeof useRouter>
 }) {
   const {
     attributes,
@@ -185,11 +183,7 @@ export default function SymptomsPage() {
   })
   const router = useRouter()
 
-  useEffect(() => {
-    fetchSymptoms()
-  }, [])
-
-  const fetchSymptoms = async () => {
+  const fetchSymptoms = useCallback(async () => {
     try {
       const response = await fetch('/api/admin/symptoms')
       if (response.ok) {
@@ -204,7 +198,11 @@ export default function SymptomsPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [router])
+
+  useEffect(() => {
+    fetchSymptoms()
+  }, [fetchSymptoms])
 
   const openDialog = (symptom?: Symptom) => {
     if (symptom) {
