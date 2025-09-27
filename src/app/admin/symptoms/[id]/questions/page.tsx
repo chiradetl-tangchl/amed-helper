@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -21,10 +21,28 @@ import {
   Save, 
   X,
   MessageSquare,
-  Eye,
-  EyeOff
+  GripVertical
 } from 'lucide-react'
 import Swal from 'sweetalert2'
+import { 
+  DndContext, 
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import {
+  useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 interface Symptom {
   id: number
@@ -55,6 +73,85 @@ interface Question {
   options: QuestionOption[]
 }
 
+// SortableRow component for drag and drop
+function SortableQuestionRow({ 
+  question, 
+  onEdit, 
+  onDelete 
+}: {
+  question: Question
+  onEdit: (question: Question) => void
+  onDelete: (question: Question) => void
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: question.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  const getTypeLabel = (type: string) => {
+    switch (type) {
+      case 'radio': return 'ตัวเลือกเดียว'
+      case 'checkbox': return 'หลายตัวเลือก'
+      case 'select': return 'รายการ'
+      case 'text': return 'ข้อความ'
+      case 'number': return 'ตัวเลข'
+      default: return type
+    }
+  }
+
+  return (
+    <TableRow ref={setNodeRef} style={style} className={isDragging ? 'z-50' : ''}>
+      <TableCell>
+        <div 
+          className="flex items-center cursor-grab active:cursor-grabbing"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="h-4 w-4 text-gray-400" />
+        </div>
+      </TableCell>
+      <TableCell className="font-medium">{question.title}</TableCell>
+      <TableCell>{question.description || '-'}</TableCell>
+      <TableCell>
+        <Badge variant="outline">{getTypeLabel(question.type)}</Badge>
+      </TableCell>
+      <TableCell className="text-center">{question.order}</TableCell>
+      <TableCell className="text-center">{question.options.length}</TableCell>
+      <TableCell>
+        <div className="flex gap-2 justify-end">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onEdit(question)}
+            title="แก้ไข"
+          >
+            <Edit className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onDelete(question)}
+            className="text-red-600"
+            title="ลบ"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </TableCell>
+    </TableRow>
+  )
+}
+
 export default function QuestionsPage({ params }: { params: Promise<{ id: string }> }) {
   const [symptom, setSymptom] = useState<Symptom | null>(null)
   const [questions, setQuestions] = useState<Question[]>([])
@@ -83,13 +180,7 @@ export default function QuestionsPage({ params }: { params: Promise<{ id: string
     })
   }, [params])
 
-  useEffect(() => {
-    if (symptomId) {
-      fetchQuestionsData()
-    }
-  }, [symptomId])
-
-  const fetchQuestionsData = async () => {
+  const fetchQuestionsData = useCallback(async () => {
     if (!symptomId) return
     
     try {
@@ -105,6 +196,67 @@ export default function QuestionsPage({ params }: { params: Promise<{ id: string
       console.error('Get questions error:', error)
     } finally {
       setIsLoading(false)
+    }
+  }, [symptomId])
+
+  useEffect(() => {
+    if (symptomId) {
+      fetchQuestionsData()
+    }
+  }, [symptomId, fetchQuestionsData])
+
+  // Drag and drop functionality
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (active.id !== over?.id) {
+      const oldIndex = questions.findIndex((item) => item.id === active.id)
+      const newIndex = questions.findIndex((item) => item.id === over?.id)
+
+      const newQuestions = arrayMove(questions, oldIndex, newIndex)
+      
+      // Update order in the array
+      const updatedQuestions = newQuestions.map((question, index) => ({
+        ...question,
+        order: index + 1
+      }))
+      
+      setQuestions(updatedQuestions)
+
+      // Update order in database
+      try {
+        const updatePromises = updatedQuestions.map((question) =>
+          fetch(`/api/admin/symptoms/${symptomId}/questions/${question.id}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ ...question, order: question.order }),
+          })
+        )
+
+        await Promise.all(updatePromises)
+        
+        Swal.fire({
+          title: 'จัดเรียงเรียบร้อย!',
+          text: 'อัปเดตลำดับคำถามแล้ว',
+          icon: 'success',
+          timer: 1500,
+          showConfirmButton: false
+        })
+      } catch (error) {
+        console.error('Update order error:', error)
+        // Revert changes on error
+        await fetchQuestionsData()
+        Swal.fire('เกิดข้อผิดพลาด', 'ไม่สามารถอัปเดตลำดับได้', 'error')
+      }
     }
   }
 
@@ -571,78 +723,42 @@ export default function QuestionsPage({ params }: { params: Promise<{ id: string
         </CardHeader>
         <CardContent>
           {questions.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>ลำดับ</TableHead>
-                  <TableHead>คำถาม</TableHead>
-                  <TableHead>ประเภท</TableHead>
-                  <TableHead>สถานะ</TableHead>
-                  <TableHead>จำนวนตัวเลือก</TableHead>
-                  <TableHead className="text-right">การจัดการ</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {questions
-                  .sort((a, b) => a.order - b.order)
-                  .map((question) => (
-                    <TableRow key={question.id}>
-                      <TableCell>{question.order}</TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{question.title}</div>
-                          {question.description && (
-                            <div className="text-sm text-gray-500">{question.description}</div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {question.type === 'radio' && 'ตัวเลือกเดียว'}
-                          {question.type === 'checkbox' && 'หลายตัวเลือก'}
-                          {question.type === 'select' && 'รายการเลือก'}
-                          {question.type === 'text' && 'ข้อความ'}
-                          {question.type === 'number' && 'ตัวเลข'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          {question.isRequired && (
-                            <Badge variant="destructive" className="text-xs">บังคับ</Badge>
-                          )}
-                          {question.isGeneral && (
-                            <Badge variant="secondary" className="text-xs">ทั่วไป</Badge>
-                          )}
-                          {question.isCC && (
-                            <Badge variant="default" className="text-xs">CC</Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {question.options?.length || 0}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => openDialog(question)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleDelete(question)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-              </TableBody>
-            </Table>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">จัดเรียง</TableHead>
+                    <TableHead>คำถาม</TableHead>
+                    <TableHead>รายละเอียด</TableHead>
+                    <TableHead>ประเภท</TableHead>
+                    <TableHead className="text-center">ลำดับ</TableHead>
+                    <TableHead className="text-center">ตัวเลือก</TableHead>
+                    <TableHead className="text-right">การจัดการ</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <SortableContext 
+                  items={questions.map(q => q.id)} 
+                  strategy={verticalListSortingStrategy}
+                >
+                  <TableBody>
+                    {questions
+                      .sort((a, b) => a.order - b.order)
+                      .map((question) => (
+                      <SortableQuestionRow
+                        key={question.id}
+                        question={question}
+                        onEdit={openDialog}
+                        onDelete={handleDelete}
+                      />
+                    ))}
+                  </TableBody>
+                </SortableContext>
+              </Table>
+            </DndContext>
           ) : (
             <div className="text-center py-8 text-gray-500">
               <MessageSquare className="h-16 w-16 mx-auto mb-4 text-gray-300" />

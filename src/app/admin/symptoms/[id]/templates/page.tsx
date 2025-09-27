@@ -1,8 +1,6 @@
-/* eslint-disable */
-// @ts-nocheck
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -21,13 +19,31 @@ import {
   Save, 
   X,
   FileText as TemplateIcon,
-  Eye,
-  EyeOff,
   Code,
-  FileText,
-  MessageSquare
+  GripVertical,
+  Eye,
+  EyeOff
 } from 'lucide-react'
 import Swal from 'sweetalert2'
+import { 
+  DndContext, 
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import {
+  useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 interface Symptom {
   id: number
@@ -49,11 +65,110 @@ interface TextTemplate {
   isActive: boolean
   createdAt: string
   updatedAt: string
-  question?: {
-    id: number
-    title: string
-    type: string
-  } | null
+}
+
+// SortableRow component for drag and drop
+function SortableTemplateRow({ 
+  template, 
+  symptom,
+  onEdit, 
+  onDelete,
+  onToggleActive
+}: {
+  template: TextTemplate
+  symptom: Symptom | null
+  onEdit: (template: TextTemplate) => void
+  onDelete: (template: TextTemplate) => void
+  onToggleActive: (template: TextTemplate) => void
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: template.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  const getQuestionTitle = () => {
+    if (!template.questionId || !symptom?.questions) return 'ทั่วไป'
+    const question = symptom.questions.find(q => q.id === template.questionId)
+    return question ? question.title : 'ไม่พบคำถาม'
+  }
+
+  return (
+    <TableRow ref={setNodeRef} style={style} className={isDragging ? 'z-50' : ''}>
+      <TableCell>
+        <div 
+          className="flex items-center cursor-grab active:cursor-grabbing"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="h-4 w-4 text-gray-400" />
+        </div>
+      </TableCell>
+      <TableCell className="font-medium max-w-xs">
+        <div className="truncate" title={template.template}>
+          {template.template}
+        </div>
+      </TableCell>
+      <TableCell className="max-w-xs">
+        <div className="truncate" title={getQuestionTitle()}>
+          {getQuestionTitle()}
+        </div>
+      </TableCell>
+      <TableCell>
+        {template.triggerValue || '-'}
+      </TableCell>
+      <TableCell>
+        <Badge 
+          variant={template.isActive ? "default" : "secondary"}
+          className="cursor-pointer"
+          onClick={() => onToggleActive(template)}
+        >
+          {template.isActive ? (
+            <>
+              <Eye className="h-3 w-3 mr-1" />
+              เปิดใช้งาน
+            </>
+          ) : (
+            <>
+              <EyeOff className="h-3 w-3 mr-1" />
+              ปิดใช้งาน
+            </>
+          )}
+        </Badge>
+      </TableCell>
+      <TableCell className="text-center">{template.order}</TableCell>
+      <TableCell>
+        <div className="flex gap-2 justify-end">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onEdit(template)}
+            title="แก้ไข"
+          >
+            <Edit className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onDelete(template)}
+            className="text-red-600"
+            title="ลบ"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </TableCell>
+    </TableRow>
+  )
 }
 
 export default function TemplatesPage({ params }: { params: Promise<{ id: string }> }) {
@@ -78,23 +193,7 @@ export default function TemplatesPage({ params }: { params: Promise<{ id: string
     })
   }, [params])
 
-  useEffect(() => {
-    if (symptomId) {
-      fetchTemplatesData()
-    }
-  }, [symptomId])
-
-  useEffect(() => {
-    // Generate preview text when template changes
-    if (formData.template) {
-      const preview = generatePreview(formData.template)
-      setPreviewText(preview)
-    } else {
-      setPreviewText('')
-    }
-  }, [formData.template])
-
-  const fetchTemplatesData = async () => {
+  const fetchTemplatesData = useCallback(async () => {
     if (!symptomId) return
     
     try {
@@ -114,6 +213,77 @@ export default function TemplatesPage({ params }: { params: Promise<{ id: string
       Swal.fire('เกิดข้อผิดพลาด', 'ไม่สามารถโหลดข้อมูลได้', 'error')
     } finally {
       setIsLoading(false)
+    }
+  }, [symptomId, router])
+
+  useEffect(() => {
+    if (symptomId) {
+      fetchTemplatesData()
+    }
+  }, [symptomId, fetchTemplatesData])
+
+  useEffect(() => {
+    // Generate preview text when template changes
+    if (formData.template) {
+      const preview = generatePreview(formData.template)
+      setPreviewText(preview)
+    } else {
+      setPreviewText('')
+    }
+  }, [formData.template])
+
+  // Drag and drop functionality
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (active.id !== over?.id) {
+      const oldIndex = templates.findIndex((item) => item.id === active.id)
+      const newIndex = templates.findIndex((item) => item.id === over?.id)
+
+      const newTemplates = arrayMove(templates, oldIndex, newIndex)
+      
+      // Update order in the array
+      const updatedTemplates = newTemplates.map((template, index) => ({
+        ...template,
+        order: index + 1
+      }))
+      
+      setTemplates(updatedTemplates)
+
+      // Update order in database
+      try {
+        const updatePromises = updatedTemplates.map((template) =>
+          fetch(`/api/admin/symptoms/${symptomId}/templates/${template.id}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ ...template, order: template.order }),
+          })
+        )
+
+        await Promise.all(updatePromises)
+        
+        Swal.fire({
+          title: 'จัดเรียงเรียบร้อย!',
+          text: 'อัปเดตลำดับเทมเพลตแล้ว',
+          icon: 'success',
+          timer: 1500,
+          showConfirmButton: false
+        })
+      } catch (error) {
+        console.error('Update order error:', error)
+        // Revert changes on error
+        await fetchTemplatesData()
+        Swal.fire('เกิดข้อผิดพลาด', 'ไม่สามารถอัปเดตลำดับได้', 'error')
+      }
     }
   }
 
@@ -327,7 +497,7 @@ export default function TemplatesPage({ params }: { params: Promise<{ id: string
                 {editingTemplate ? 'แก้ไขเทมเพลต' : 'เพิ่มเทมเพลตใหม่'}
               </DialogTitle>
               <DialogDescription>
-                กำหนดรูปแบบข้อความสรุปสำหรับอาการ "{symptom.name}"
+                กำหนดรูปแบบข้อความสรุปสำหรับอาการ &quot;{symptom.name}&quot;
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -475,7 +645,7 @@ export default function TemplatesPage({ params }: { params: Promise<{ id: string
         <CardHeader>
           <CardTitle>รายการเทมเพลต</CardTitle>
           <CardDescription>
-            จัดการเทมเพลตข้อความสำหรับอาการ "{symptom.name}"
+            จัดการเทมเพลตข้อความสำหรับอาการ &quot;{symptom.name}&quot;
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -493,91 +663,44 @@ export default function TemplatesPage({ params }: { params: Promise<{ id: string
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>ลำดับ</TableHead>
-                    <TableHead>คำถามที่เกี่ยวข้อง</TableHead>
-                    <TableHead>ค่าทริกเกอร์</TableHead>
-                    <TableHead>เทมเพลต</TableHead>
-                    <TableHead>สถานะ</TableHead>
-                    <TableHead className="text-center">การจัดการ</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {templates.map((template) => (
-                    <TableRow key={template.id}>
-                      <TableCell className="font-medium">{template.order}</TableCell>
-                      <TableCell>
-                        {template.question ? (
-                          <div>
-                            <div className="font-medium text-sm">{template.question.title}</div>
-                            <Badge variant="outline" className="text-xs mt-1">
-                              {template.question.type}
-                            </Badge>
-                          </div>
-                        ) : (
-                          <span className="text-gray-400 text-sm">ทั่วไป</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {template.triggerValue ? (
-                          <Badge variant="secondary" className="text-xs">
-                            {template.triggerValue}
-                          </Badge>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="max-w-md">
-                          <div className="text-sm text-gray-900 truncate">{template.template}</div>
-                          <div className="text-xs text-gray-500 mt-1 truncate">
-                            ตัวอย่าง: {generatePreview(template.template)}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge 
-                          variant={template.isActive ? "default" : "secondary"}
-                          className="cursor-pointer"
-                          onClick={() => toggleActive(template)}
-                        >
-                          {template.isActive ? (
-                            <>
-                              <Eye className="h-3 w-3 mr-1" />
-                              เปิดใช้งาน
-                            </>
-                          ) : (
-                            <>
-                              <EyeOff className="h-3 w-3 mr-1" />
-                              ปิดใช้งาน
-                            </>
-                          )}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex justify-center gap-1">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => openDialog(template)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleDelete(template)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">จัดเรียง</TableHead>
+                      <TableHead>เทมเพลต</TableHead>
+                      <TableHead>คำถามที่เกี่ยวข้อง</TableHead>
+                      <TableHead>ค่าทริกเกอร์</TableHead>
+                      <TableHead>สถานะ</TableHead>
+                      <TableHead className="text-center">ลำดับ</TableHead>
+                      <TableHead className="text-center">การจัดการ</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <SortableContext 
+                    items={templates.map(t => t.id)} 
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <TableBody>
+                      {templates
+                        .sort((a, b) => a.order - b.order)
+                        .map((template) => (
+                        <SortableTemplateRow
+                          key={template.id}
+                          template={template}
+                          symptom={symptom}
+                          onEdit={openDialog}
+                          onDelete={handleDelete}
+                          onToggleActive={toggleActive}
+                        />
+                      ))}
+                    </TableBody>
+                  </SortableContext>
+                </Table>
+              </DndContext>
             </div>
           )}
         </CardContent>
