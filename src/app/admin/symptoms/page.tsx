@@ -22,9 +22,29 @@ import {
   Users,
   Eye,
   EyeOff,
-  Copy
+  Copy,
+  GripVertical
 } from 'lucide-react'
 import Swal from 'sweetalert2'
+import { 
+  DndContext, 
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import {
+  useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 interface Symptom {
   id: number
@@ -39,6 +59,118 @@ interface Symptom {
     textTemplates: number
     userSubmissions: number
   }
+}
+
+// SortableRow component for drag and drop
+function SortableRow({ 
+  symptom, 
+  onEdit, 
+  onDelete, 
+  onCopy, 
+  onToggleActive,
+  router 
+}: {
+  symptom: Symptom
+  onEdit: (symptom: Symptom) => void
+  onDelete: (symptom: Symptom) => void
+  onCopy: (symptom: Symptom) => void
+  onToggleActive: (symptom: Symptom) => void
+  router: any
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: symptom.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  return (
+    <TableRow ref={setNodeRef} style={style} className={isDragging ? 'z-50' : ''}>
+      <TableCell>
+        <div 
+          className="flex items-center cursor-grab active:cursor-grabbing"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="h-4 w-4 text-gray-400" />
+        </div>
+      </TableCell>
+      <TableCell className="font-medium">{symptom.name}</TableCell>
+      <TableCell className="max-w-xs">
+        <div className="truncate" title={symptom.description || ''}>
+          {symptom.description || '-'}
+        </div>
+      </TableCell>
+      <TableCell>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onToggleActive(symptom)}
+          className={symptom.isActive ? 'text-green-600' : 'text-red-600'}
+        >
+          {symptom.isActive ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+        </Button>
+      </TableCell>
+      <TableCell className="text-center">{symptom.order}</TableCell>
+      <TableCell className="text-center">{symptom._count.questions}</TableCell>
+      <TableCell className="text-center">{symptom._count.textTemplates}</TableCell>
+      <TableCell className="text-center">{symptom._count.userSubmissions}</TableCell>
+      <TableCell>
+        <div className="flex gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push(`/admin/symptoms/${symptom.id}/questions`)}
+            title="จัดการคำถาม"
+          >
+            <MessageSquare className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push(`/admin/symptoms/${symptom.id}/templates`)}
+            title="จัดการเทมเพลต"
+          >
+            <FileText className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onCopy(symptom)}
+            title="ทำสำเนา"
+            className="text-blue-600"
+          >
+            <Copy className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onEdit(symptom)}
+            title="แก้ไข"
+          >
+            <Edit className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onDelete(symptom)}
+            className="text-red-600"
+            title="ลบ"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </TableCell>
+    </TableRow>
+  )
 }
 
 export default function SymptomsPage() {
@@ -235,6 +367,61 @@ export default function SymptomsPage() {
     }
   }
 
+  // Drag and drop functionality
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (active.id !== over?.id) {
+      const oldIndex = symptoms.findIndex((item) => item.id === active.id)
+      const newIndex = symptoms.findIndex((item) => item.id === over?.id)
+
+      const newSymptoms = arrayMove(symptoms, oldIndex, newIndex)
+      
+      // Update order in the array
+      const updatedSymptoms = newSymptoms.map((symptom, index) => ({
+        ...symptom,
+        order: index + 1
+      }))
+      
+      setSymptoms(updatedSymptoms)
+
+      // Update order in database
+      try {
+        const updatePromises = updatedSymptoms.map((symptom) =>
+          fetch(`/api/admin/symptoms/${symptom.id}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ ...symptom, order: symptom.order }),
+          })
+        )
+
+        await Promise.all(updatePromises)
+        
+        Swal.fire({
+          title: 'จัดเรียงเรียบร้อย!',
+          text: 'อัปเดตลำดับอาการแล้ว',
+          icon: 'success',
+          timer: 1500,
+          showConfirmButton: false
+        })
+      } catch (error) {
+        console.error('Update order error:', error)
+        // Revert changes on error
+        await fetchSymptoms()
+        Swal.fire('เกิดข้อผิดพลาด', 'ไม่สามารถอัปเดตลำดับได้', 'error')
+      }
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -375,114 +562,47 @@ export default function SymptomsPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>ลำดับ</TableHead>
-                    <TableHead>ชื่ออาการ/โรค</TableHead>
-                    <TableHead>รายละเอียด</TableHead>
-                    <TableHead>สถานะ</TableHead>
-                    <TableHead className="text-center">คำถาม</TableHead>
-                    <TableHead className="text-center">เทมเพลต</TableHead>
-                    <TableHead className="text-center">การใช้งาน</TableHead>
-                    <TableHead className="text-center">การจัดการ</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {symptoms.map((symptom) => (
-                    <TableRow key={symptom.id}>
-                      <TableCell className="font-medium">{symptom.order}</TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{symptom.name}</div>
-                          <div className="text-xs text-gray-500">
-                            อัปเดต: {new Date(symptom.updatedAt).toLocaleDateString('th-TH')}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="max-w-xs truncate">
-                          {symptom.description || '-'}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge 
-                          variant={symptom.isActive ? "default" : "secondary"}
-                          className="cursor-pointer"
-                          onClick={() => toggleActive(symptom)}
-                        >
-                          {symptom.isActive ? (
-                            <>
-                              <Eye className="h-3 w-3 mr-1" />
-                              เปิดใช้งาน
-                            </>
-                          ) : (
-                            <>
-                              <EyeOff className="h-3 w-3 mr-1" />
-                              ปิดใช้งาน
-                            </>
-                          )}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="outline">
-                          {symptom._count.questions}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="outline">
-                          {symptom._count.textTemplates}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="outline">
-                          {symptom._count.userSubmissions}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex justify-center gap-1">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => openDialog(symptom)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => copySymptom(symptom)}
-                            title="ทำสำเนา"
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => router.push(`/admin/symptoms/${symptom.id}/questions`)}
-                          >
-                            <MessageSquare className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => router.push(`/admin/symptoms/${symptom.id}/templates`)}
-                          >
-                            <FileText className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleDelete(symptom)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">จัดเรียง</TableHead>
+                      <TableHead>ชื่ออาการ/โรค</TableHead>
+                      <TableHead>รายละเอียด</TableHead>
+                      <TableHead>สถานะ</TableHead>
+                      <TableHead className="text-center">ลำดับ</TableHead>
+                      <TableHead className="text-center">คำถาม</TableHead>
+                      <TableHead className="text-center">เทมเพลต</TableHead>
+                      <TableHead className="text-center">การใช้งาน</TableHead>
+                      <TableHead className="text-center">การจัดการ</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <SortableContext 
+                    items={symptoms.map(s => s.id)} 
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <TableBody>
+                      {symptoms
+                        .sort((a, b) => a.order - b.order)
+                        .map((symptom) => (
+                        <SortableRow
+                          key={symptom.id}
+                          symptom={symptom}
+                          onEdit={openDialog}
+                          onDelete={handleDelete}
+                          onCopy={copySymptom}
+                          onToggleActive={toggleActive}
+                          router={router}
+                        />
+                      ))}
+                    </TableBody>
+                  </SortableContext>
+                </Table>
+              </DndContext>
             </div>
           )}
         </CardContent>
