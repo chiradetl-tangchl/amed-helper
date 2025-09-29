@@ -7,6 +7,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const t0 = Date.now()
     const symptomId = parseInt((await params).id)
     
     const symptom = await prisma.symptom.findUnique({
@@ -39,17 +40,24 @@ export async function GET(
         }
       }
     })
+    const dbMs = Date.now() - t0
 
     if (!symptom) {
       return NextResponse.json(
         { error: 'Symptom not found' },
-        { status: 404 }
+        { status: 404, headers: { 'Cache-Control': 'no-store', 'Server-Timing': `db;dur=${dbMs}`, 'x-db-time': String(dbMs) } }
       )
     }
 
-    return NextResponse.json({ symptom })
+    return NextResponse.json(
+      { symptom },
+      { headers: { 'Cache-Control': 'no-store', 'Server-Timing': `db;dur=${dbMs}`, 'x-db-time': String(dbMs) } }
+    )
   } catch (error) {
     console.error('Get public symptom error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500, headers: { 'Cache-Control': 'no-store' } }
+    )
   }
 }

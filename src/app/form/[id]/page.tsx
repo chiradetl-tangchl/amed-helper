@@ -184,7 +184,14 @@ export default function DynamicFormPage({ params }: { params: Promise<{ id: stri
     if (!symptomId) return
     
     try {
-      const response = await fetch(`/api/symptoms/${symptomId}`)
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 12000) // 12s timeout to avoid Chrome hanging
+      const response = await fetch(`/api/symptoms/${symptomId}` , {
+        signal: controller.signal,
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-store' },
+      })
+      clearTimeout(timeout)
       if (response.ok) {
         const data = await response.json()
         console.log('Fetched symptom data:', data.symptom)
@@ -209,7 +216,8 @@ export default function DynamicFormPage({ params }: { params: Promise<{ id: stri
       }
     } catch (error) {
       console.error('Fetch symptom error:', error)
-      Swal.fire('เกิดข้อผิดพลาด', 'ไม่สามารถโหลดข้อมูลได้', 'error')
+      const msg = (error as any)?.name === 'AbortError' ? 'การเชื่อมต่อนานเกินไป (Timeout) กรุณาลองใหม่' : 'ไม่สามารถโหลดข้อมูลได้'
+      Swal.fire('เกิดข้อผิดพลาด', msg, 'error')
     } finally {
       setIsLoading(false)
     }
