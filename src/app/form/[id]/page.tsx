@@ -226,51 +226,48 @@ export default function DynamicFormPage({ params }: { params: Promise<{ id: stri
   const updateVisibleQuestions = useCallback(() => {
     if (!symptom) return
 
-    const newVisibleQuestions = new Set<number>()
+    const nextVisible = new Set<number>()
     
     // Always show root questions and general questions
-    symptom.questions.forEach(question => {
+    for (const question of symptom.questions) {
       if (!question.parentQuestionId || question.isGeneral) {
-        newVisibleQuestions.add(question.id)
+        nextVisible.add(question.id)
       }
-    })
+    }
 
     // Check conditional questions
-    symptom.questions.forEach(question => {
+    for (const question of symptom.questions) {
       if (question.parentQuestionId && question.conditionalValues) {
         const parentAnswer = answers[question.parentQuestionId]
         if (parentAnswer) {
           const conditionalValues = JSON.parse(question.conditionalValues)
           let shouldShow = false
           
-          // Handle different question types
           if (Array.isArray(parentAnswer.value)) {
-            // For checkbox (multiple values) - need to convert option IDs to values
             const parentQuestion = symptom.questions.find(q => q.id === question.parentQuestionId)
             if (parentQuestion) {
               shouldShow = parentAnswer.value.some(optionId => {
                 const selectedOption = parentQuestion.options?.find(opt => opt.id === optionId)
-                if (selectedOption) {
-                  // Compare option.value only (like radio does)
-                  return conditionalValues.includes(selectedOption.value)
-                }
-                return false
+                return selectedOption ? conditionalValues.includes(selectedOption.value) : false
               })
             }
           } else {
-            // For radio, select, text (single value) - works as before
             shouldShow = conditionalValues.includes(parentAnswer.value)
           }
           
           if (shouldShow) {
-            newVisibleQuestions.add(question.id)
+            nextVisible.add(question.id)
           }
         }
       }
-    })
+    }
 
-    setVisibleQuestions(newVisibleQuestions)
-  }, [answers, symptom])
+    // Only update state if changed to avoid render loops
+    const isSame = nextVisible.size === visibleQuestions.size && [...nextVisible].every((id) => visibleQuestions.has(id))
+    if (!isSame) {
+      setVisibleQuestions(nextVisible)
+    }
+  }, [answers, symptom, visibleQuestions])
 
   const generateSummary = useCallback(() => {
     if (!symptom || !symptom.textTemplates) {
@@ -282,9 +279,8 @@ export default function DynamicFormPage({ params }: { params: Promise<{ id: stri
     const otherParts: string[] = []
 
     // Process templates in order
-    symptom.textTemplates
-      .sort((a, b) => a.order - b.order)
-      .forEach(template => {
+    const sortedTemplates = [...(symptom.textTemplates || [])].sort((a, b) => a.order - b.order)
+    sortedTemplates.forEach(template => {
         let shouldInclude = false
         let templateText = template.template
 
