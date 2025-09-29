@@ -278,30 +278,40 @@ export default function DynamicFormPage({ params }: { params: Promise<{ id: stri
     const ccParts: string[] = []
     const otherParts: string[] = []
 
-    // Helper: compact common prefix across labels (e.g., "บริเวณลิ้นปี่, บริเวณซ้ายล่าง" -> "บริเวณลิ้นปี่, ซ้ายล่าง")
-    const formatLabelsWithCommonPrefix = (labels: string[]) => {
-      if (!labels || labels.length <= 1) return labels.join(', ')
-      let prefix = labels[0] || ''
-      for (const label of labels) {
-        let i = 0
-        const max = Math.min(prefix.length, label.length)
-        while (i < max && prefix[i] === label[i]) i++
-        prefix = prefix.slice(0, i)
-        if (!prefix) break
+    // Helper: explicit marker-based grouping for checkbox labels.
+      // If labels contain pattern like "{บริเวณ}ลิ้นปี่", "{บริเวณ}ซ้ายล่าง",
+      // output becomes "บริเวณลิ้นปี่, ซ้ายล่าง".
+      const groupLabelsByMarker = (labels: string[]): string | null => {
+        if (!labels || labels.length === 0) return ''
+        const groups: Record<string, string[]> = {}
+        const plain: string[] = []
+        for (const raw of labels) {
+          const l = raw || ''
+          const m = l.match(/^\{([^}]+)\}(.*)$/)
+          if (m) {
+            const key = (m[1] || '').trim()
+            const suffix = (m[2] || '').trim()
+            if (!groups[key]) groups[key] = []
+            groups[key].push(suffix)
+          } else {
+            plain.push(l)
+          }
+        }
+        const keys = Object.keys(groups)
+        if (keys.length === 0) return null
+        const parts: string[] = []
+        for (const k of keys) {
+          const suffixes = (groups[k] || []).filter(s => s && s.trim())
+          if (suffixes.length === 0) {
+            parts.push(k)
+          } else {
+            parts.push(`${k}${suffixes.join(', ')}`)
+          }
+        }
+        // Append ungrouped labels as-is
+        for (const p of plain) parts.push(p)
+        return parts.join(', ')
       }
-      prefix = prefix.trim()
-      // If prefix is too short or equals first label, fallback
-      if (prefix.length < 2 || prefix === (labels[0] || '')) return labels.join(', ')
-      // Avoid cutting mid-word if there is whitespace
-      const lastSpace = prefix.lastIndexOf(' ')
-      if (lastSpace > 0) {
-        prefix = prefix.slice(0, lastSpace + 1)
-      }
-      const rest = labels.map(l => (l || '').slice(prefix.length).trim()).filter(Boolean)
-      if (rest.length !== labels.length) return labels.join(', ')
-      return `${prefix}${rest.join(', ')}`
-    }
-
     // Precompute: for checkbox questions, check if any specific template (triggerValue) matches selected options
     const selectedOptionValuesByQuestion: Record<number, Set<string>> = {}
     for (const q of symptom.questions || []) {
@@ -396,7 +406,8 @@ export default function DynamicFormPage({ params }: { params: Promise<{ id: stri
                     
                     if (labels.length === 0) return '__SKIP_TEMPLATE__'
                     // Join multiple labels with compact common prefix
-                    return formatLabelsWithCommonPrefix(labels)
+                      const grouped = groupLabelsByMarker(labels)
+                      return grouped ?? labels.join(', ')
                   }
                   // Handle radio/select (single selection)
                   else if (answer.optionId) {
@@ -522,7 +533,8 @@ export default function DynamicFormPage({ params }: { params: Promise<{ id: stri
                     
                     if (labels.length === 0) return '__SKIP_TEMPLATE__'
                     // Join multiple labels with compact common prefix
-                    return formatLabelsWithCommonPrefix(labels)
+                      const grouped2 = groupLabelsByMarker(labels)
+                      return grouped2 ?? labels.join(', ')
                   }
                   // Handle radio/select (single selection)
                   else if (answer.optionId) {
@@ -776,13 +788,18 @@ export default function DynamicFormPage({ params }: { params: Promise<{ id: stri
                 <div key={option.id} className="space-y-2">
                   <div className="flex items-center space-x-4 p-3 rounded-xl border-2 border-blue-100 hover:border-blue-300 hover:bg-blue-50/30 transition-all duration-300 group cursor-pointer">
                     <RadioGroupItem value={option.value} id={`${question.id}-${option.id}`} className="h-6 w-6 border-2 border-blue-400 text-blue-600 group-hover:border-blue-500" />
-                    <Label htmlFor={`${question.id}-${option.id}`} className="text-xl font-semibold leading-snug cursor-pointer flex-1 text-gray-800 group-hover:text-blue-800">
-                      {option.label}
-                    </Label>
+                    {(() => {
+                      const displayLabel = option.label?.replace(/^\{[^}]+\}/, '') || option.label
+                      return (
+                        <Label htmlFor={`${question.id}-${option.id}`} className="text-xl font-semibold leading-snug cursor-pointer flex-1 text-gray-800 group-hover:text-blue-800">
+                          {displayLabel}
+                        </Label>
+                      )
+                    })()}
                   </div>
                   
                   {/* Show text input for "other" option */}
-                  {(option.label.toLowerCase().includes('อื่น') || option.label.toLowerCase().includes('other')) && 
+                  {((option.label?.replace(/^\{[^}]+\}/, '') || option.label).toLowerCase().includes('อื่น') || (option.label?.replace(/^\{[^}]+\}/, '') || option.label).toLowerCase().includes('other')) && 
                    answer?.value?.toString() === option.value && (
                     <div className="ml-10">
                       <Input
@@ -830,13 +847,18 @@ export default function DynamicFormPage({ params }: { params: Promise<{ id: stri
                     }
                     className="h-6 w-6 border-2 border-blue-400 text-blue-600 group-hover:border-blue-500"
                   />
-                  <Label htmlFor={`${question.id}-${option.id}`} className="text-xl font-semibold leading-snug cursor-pointer flex-1 text-gray-800 group-hover:text-blue-800">
-                    {option.label}
-                  </Label>
+                  {(() => {
+                    const displayLabel = option.label?.replace(/^\{[^}]+\}/, '') || option.label
+                    return (
+                      <Label htmlFor={`${question.id}-${option.id}`} className="text-xl font-semibold leading-snug cursor-pointer flex-1 text-gray-800 group-hover:text-blue-800">
+                        {displayLabel}
+                      </Label>
+                    )
+                  })()}
                 </div>
                 
                 {/* Show text input for "other" option */}
-                {(option.label.toLowerCase().includes('อื่น') || option.label.toLowerCase().includes('other')) && 
+                {((option.label?.replace(/^\{[^}]+\}/, '') || option.label).toLowerCase().includes('อื่น') || (option.label?.replace(/^\{[^}]+\}/, '') || option.label).toLowerCase().includes('other')) && 
                  Array.isArray(answer?.value) && answer.value.includes(option.id) && (
                   <div className="ml-10">
                     <Input
@@ -870,8 +892,9 @@ export default function DynamicFormPage({ params }: { params: Promise<{ id: stri
         )
 
       case 'select':
-        const selectedOption = question.options.find(o => o.value === answer?.value?.toString())
-        const isOtherSelected = selectedOption && (selectedOption.label.toLowerCase().includes('อื่น') || selectedOption.label.toLowerCase().includes('other'))
+  const selectedOption = question.options.find(o => o.value === answer?.value?.toString())
+  const selectedLabelSanitized = selectedOption ? (selectedOption.label?.replace(/^\{[^}]+\}/, '') || selectedOption.label) : ''
+  const isOtherSelected = selectedOption && (selectedLabelSanitized.toLowerCase().includes('อื่น') || selectedLabelSanitized.toLowerCase().includes('other'))
         const hasInputSelected = selectedOption && selectedOption.hasInput
         
         return (
@@ -889,7 +912,7 @@ export default function DynamicFormPage({ params }: { params: Promise<{ id: stri
               <SelectContent className="rounded-xl border-2 border-blue-100">
                 {question.options.map((option) => (
                   <SelectItem key={option.id} value={option.value} className="text-base py-3 hover:bg-blue-50 focus:bg-blue-100 rounded-lg mx-1">
-                    {option.label}
+                    {(option.label?.replace(/^\{[^}]+\}/, '') || option.label)}
                   </SelectItem>
                 ))}
               </SelectContent>
