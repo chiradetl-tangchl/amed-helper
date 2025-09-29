@@ -278,6 +278,48 @@ export default function DynamicFormPage({ params }: { params: Promise<{ id: stri
     const ccParts: string[] = []
     const otherParts: string[] = []
 
+    // Helper: compact common prefix across labels (e.g., "บริเวณลิ้นปี่, บริเวณซ้ายล่าง" -> "บริเวณลิ้นปี่, ซ้ายล่าง")
+    const formatLabelsWithCommonPrefix = (labels: string[]) => {
+      if (!labels || labels.length <= 1) return labels.join(', ')
+      let prefix = labels[0] || ''
+      for (const label of labels) {
+        let i = 0
+        const max = Math.min(prefix.length, label.length)
+        while (i < max && prefix[i] === label[i]) i++
+        prefix = prefix.slice(0, i)
+        if (!prefix) break
+      }
+      prefix = prefix.trim()
+      // If prefix is too short or equals first label, fallback
+      if (prefix.length < 2 || prefix === (labels[0] || '')) return labels.join(', ')
+      // Avoid cutting mid-word if there is whitespace
+      const lastSpace = prefix.lastIndexOf(' ')
+      if (lastSpace > 0) {
+        prefix = prefix.slice(0, lastSpace + 1)
+      }
+      const rest = labels.map(l => (l || '').slice(prefix.length).trim()).filter(Boolean)
+      if (rest.length !== labels.length) return labels.join(', ')
+      return `${prefix}${rest.join(', ')}`
+    }
+
+    // Precompute: for checkbox questions, check if any specific template (triggerValue) matches selected options
+    const selectedOptionValuesByQuestion: Record<number, Set<string>> = {}
+    for (const q of symptom.questions || []) {
+      const ans = answers[q.id]
+      if (q.type === 'checkbox' && ans && Array.isArray(ans.value)) {
+        const selectedOpts = q.options?.filter(opt => ans.value.includes(opt.id)) || []
+        selectedOptionValuesByQuestion[q.id] = new Set(selectedOpts.map(opt => opt.value))
+      }
+    }
+    const hasSpecificTemplateMatch: Record<number, boolean> = {}
+    for (const t of symptom.textTemplates || []) {
+      if (!t.questionId || !t.triggerValue) continue
+      const set = selectedOptionValuesByQuestion[t.questionId]
+      if (set && set.has(t.triggerValue)) {
+        hasSpecificTemplateMatch[t.questionId] = true
+      }
+    }
+
     // Process templates in order
     const sortedTemplates = [...(symptom.textTemplates || [])].sort((a, b) => a.order - b.order)
     sortedTemplates.forEach(template => {
@@ -287,7 +329,17 @@ export default function DynamicFormPage({ params }: { params: Promise<{ id: stri
         if (template.questionId && template.triggerValue) {
           // Template is triggered by specific question value
           const answer = answers[template.questionId]
-          if (answer && answer.value === template.triggerValue) {
+          const relatedQuestion = symptom.questions?.find(q => q.id === template.questionId)
+          let triggerMatched = false
+          if (relatedQuestion?.type === 'checkbox' && answer && Array.isArray(answer.value)) {
+            // For checkbox: match when any selected option's value equals triggerValue
+            const selectedValues = selectedOptionValuesByQuestion[template.questionId]
+            triggerMatched = !!(selectedValues && selectedValues.has(template.triggerValue))
+          } else if (answer) {
+            triggerMatched = (answer.value === template.triggerValue)
+          }
+
+          if (triggerMatched) {
             shouldInclude = true
             
             // Replace placeholders with actual values
@@ -343,9 +395,8 @@ export default function DynamicFormPage({ params }: { params: Promise<{ id: stri
                     })
                     
                     if (labels.length === 0) return '__SKIP_TEMPLATE__'
-                    
-                    // Join multiple labels - you can customize the separator here
-                    return labels.join(', ') // Using comma + space as default
+                    // Join multiple labels with compact common prefix
+                    return formatLabelsWithCommonPrefix(labels)
                   }
                   // Handle radio/select (single selection)
                   else if (answer.optionId) {
@@ -410,7 +461,11 @@ export default function DynamicFormPage({ params }: { params: Promise<{ id: stri
         } else if (template.questionId && (template.triggerValue === '' || template.triggerValue === null)) {
           // Template for any value (especially for number/text inputs)
           const answer = answers[template.questionId]
-          if (answer && (answer.textValue || answer.value)) {
+          const relatedQuestion = symptom.questions?.find(q => q.id === template.questionId)
+          // If this is a checkbox question and we already have specific matches, skip generic to avoid duplication
+          if (relatedQuestion?.type === 'checkbox' && hasSpecificTemplateMatch[template.questionId]) {
+            // do nothing - skip this generic template
+          } else if (answer && (answer.textValue || answer.value)) {
             shouldInclude = true
             
             // Replace placeholders with actual values
@@ -466,9 +521,8 @@ export default function DynamicFormPage({ params }: { params: Promise<{ id: stri
                     })
                     
                     if (labels.length === 0) return '__SKIP_TEMPLATE__'
-                    
-                    // Join multiple labels - you can customize the separator here
-                    return labels.join(', ') // Using comma + space as default
+                    // Join multiple labels with compact common prefix
+                    return formatLabelsWithCommonPrefix(labels)
                   }
                   // Handle radio/select (single selection)
                   else if (answer.optionId) {
