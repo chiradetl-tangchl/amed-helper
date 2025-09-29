@@ -2,6 +2,7 @@
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
+@custom-variant compact (&:is(.compact *));
 
 /* Modern animations for the perfect UI */
 @keyframes blob {
@@ -77,7 +78,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-noto-sans-thai), var(--font-geist-sans);
+  /* Prefer Bai Jamjuree (looped Thai) for formal readability, fallback to Sarabun, Noto Sans Thai, and Geist */
+  --font-sans: var(--font-bai-jamjuree), var(--font-sarabun), var(--font-noto-sans-thai), var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -203,14 +205,67 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: var(--font-noto-sans-thai), var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* Use Bai Jamjuree first for clearer looped Thai text */
+  font-family: var(--font-bai-jamjuree), var(--font-sarabun), var(--font-noto-sans-thai), var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   }
   
   /* Enhanced Thai font rendering */
   html {
-    font-feature-settings: "liga" 1, "kern" 1;
+    /* Larger, more readable base size for seniors */
+    font-size: 18px; /* was ~16px default */
+    line-height: 1.7;
+    -webkit-text-size-adjust: 100%;
+    /* Enable Thai combining mark positioning */
+    font-feature-settings: "liga" 1, "kern" 1, "mark" 1, "mkmk" 1;
     text-rendering: optimizeLegibility;
   }
+
+  /* Headings scale up a bit for clearer hierarchy */
+  h1 { font-size: 2rem; line-height: 1.25; font-weight: 700; }
+  h2 { font-size: 1.625rem; line-height: 1.3; font-weight: 700; }
+  h3 { font-size: 1.375rem; line-height: 1.35; font-weight: 600; }
+  h4 { font-size: 1.25rem; line-height: 1.4; font-weight: 600; }
+
+  /* Form controls and interactive elements: bigger tap targets and text */
+  input,
+  textarea,
+  select,
+  button,
+  .btn,
+  .shadcn-button {
+    font-size: 1.0625rem; /* ~17px */
+    line-height: 1.6;
+  }
+  /* Minimum touch target height for accessibility */
+  input,
+  textarea,
+  select,
+  button {
+    min-height: 44px;
+  }
+
+  /* Compact mode for admin: denser spacing but keep font size */
+  .compact {
+    --compact-gap: 0.25rem; /* 4px */
+    --compact-pad: 0.25rem; /* 4px */
+    --compact-line: 1.5;
+  }
+  .compact table { font-size: 0.9375rem; /* ~15px for tables */ }
+  .compact .gap-4 { gap: 0.75rem !important; }
+  .compact .gap-3 { gap: 0.5rem !important; }
+  .compact .gap-2 { gap: 0.375rem !important; }
+  .compact .p-6 { padding: 1rem !important; }
+  .compact .p-4 { padding: 0.75rem !important; }
+  .compact .p-3 { padding: 0.5rem !important; }
+  .compact .px-6 { padding-left: 1rem !important; padding-right: 1rem !important; }
+  .compact .py-3 { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
+  .compact .h-10 { height: 2.25rem !important; } /* 36px */
+  .compact .h-9 { height: 2.125rem !important; } /* 34px */
+  .compact input,
+  .compact textarea,
+  .compact select { line-height: var(--compact-line); }
+  .compact .leading-none { line-height: 1.2 !important; }
+  .compact .leading-tight { line-height: 1.25 !important; }
   
   /* Custom scrollbar */
   ::-webkit-scrollbar {

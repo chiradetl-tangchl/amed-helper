@@ -294,12 +294,13 @@ export default function DynamicFormPage({ params }: { params: Promise<{ id: stri
                 
                 // Add time unit if question has time unit and it's selected
                 if (relatedQuestion?.hasTimeUnit && relatedQuestion.type === 'number' && timeUnits[template.questionId]) {
-                  const timeUnitMap: Record<string, string> = {
+                    const timeUnitMap: Record<string, string> = {
                     'minutes': 'นาที',
                     'hours': 'ชั่วโมง', 
                     'days': 'วัน',
                     'weeks': 'สัปดาห์',
-                    'months': 'เดือน'
+                    'months': 'เดือน',
+                    'years': 'ปี'
                   }
                   const unitText = timeUnitMap[timeUnits[template.questionId]] || timeUnits[template.questionId]
                   valueText += ` ${unitText}`
@@ -416,12 +417,13 @@ export default function DynamicFormPage({ params }: { params: Promise<{ id: stri
                 
                 // Add time unit if question has time unit and it's selected
                 if (relatedQuestion?.hasTimeUnit && relatedQuestion.type === 'number' && timeUnits[template.questionId]) {
-                  const timeUnitMap: Record<string, string> = {
+                    const timeUnitMap: Record<string, string> = {
                     'minutes': 'นาที',
                     'hours': 'ชั่วโมง', 
                     'days': 'วัน',
                     'weeks': 'สัปดาห์',
-                    'months': 'เดือน'
+                    'months': 'เดือน',
+                    'years': 'ปี'
                   }
                   const unitText = timeUnitMap[timeUnits[template.questionId]] || timeUnits[template.questionId]
                   valueText += ` ${unitText}`
@@ -703,20 +705,20 @@ export default function DynamicFormPage({ params }: { params: Promise<{ id: stri
     switch (question.type) {
       case 'radio':
         return (
-          <div className="space-y-4">
+          <div className="space-y-3">
             <RadioGroup
               value={answer?.value?.toString() || ''}
               onValueChange={(value) => {
                 const option = question.options.find(o => o.value === value)
                 handleAnswerChange(question.id, value, option?.id)
               }}
-              className="space-y-4"
+              className="space-y-3"
             >
               {question.options.map((option) => (
-                <div key={option.id} className="space-y-3">
-                  <div className="flex items-center space-x-4 p-4 rounded-xl border-2 border-blue-100 hover:border-blue-300 hover:bg-blue-50/30 transition-all duration-300 group cursor-pointer">
-                    <RadioGroupItem value={option.value} id={`${question.id}-${option.id}`} className="h-5 w-5 border-2 border-blue-400 text-blue-600 group-hover:border-blue-500" />
-                    <Label htmlFor={`${question.id}-${option.id}`} className="text-base font-medium leading-relaxed cursor-pointer flex-1 text-gray-800 group-hover:text-blue-800">
+                <div key={option.id} className="space-y-2">
+                  <div className="flex items-center space-x-4 p-3 rounded-xl border-2 border-blue-100 hover:border-blue-300 hover:bg-blue-50/30 transition-all duration-300 group cursor-pointer">
+                    <RadioGroupItem value={option.value} id={`${question.id}-${option.id}`} className="h-6 w-6 border-2 border-blue-400 text-blue-600 group-hover:border-blue-500" />
+                    <Label htmlFor={`${question.id}-${option.id}`} className="text-xl font-semibold leading-snug cursor-pointer flex-1 text-gray-800 group-hover:text-blue-800">
                       {option.label}
                     </Label>
                   </div>
@@ -758,19 +760,19 @@ export default function DynamicFormPage({ params }: { params: Promise<{ id: stri
 
       case 'checkbox':
         return (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {question.options.map((option) => (
-              <div key={option.id} className="space-y-3">
-                <div className="flex items-center space-x-4 p-4 rounded-xl border-2 border-blue-100 hover:border-blue-300 hover:bg-blue-50/30 transition-all duration-300 group cursor-pointer">
+              <div key={option.id} className="space-y-2">
+                <div className="flex items-center space-x-4 p-3 rounded-xl border-2 border-blue-100 hover:border-blue-300 hover:bg-blue-50/30 transition-all duration-300 group cursor-pointer">
                   <Checkbox
                     id={`${question.id}-${option.id}`}
                     checked={Array.isArray(answer?.value) && answer.value.includes(option.id)}
                     onCheckedChange={(checked) => 
                       handleCheckboxChange(question.id, option.id, checked as boolean)
                     }
-                    className="h-5 w-5 border-2 border-blue-400 text-blue-600 group-hover:border-blue-500"
+                    className="h-6 w-6 border-2 border-blue-400 text-blue-600 group-hover:border-blue-500"
                   />
-                  <Label htmlFor={`${question.id}-${option.id}`} className="text-base font-medium leading-relaxed cursor-pointer flex-1 text-gray-800 group-hover:text-blue-800">
+                  <Label htmlFor={`${question.id}-${option.id}`} className="text-xl font-semibold leading-snug cursor-pointer flex-1 text-gray-800 group-hover:text-blue-800">
                     {option.label}
                   </Label>
                 </div>
@@ -917,6 +919,7 @@ export default function DynamicFormPage({ params }: { params: Promise<{ id: stri
                       <SelectItem value="days" className="text-base py-3 hover:bg-blue-50 focus:bg-blue-100 rounded-lg mx-1">วัน</SelectItem>
                       <SelectItem value="weeks" className="text-base py-3 hover:bg-blue-50 focus:bg-blue-100 rounded-lg mx-1">สัปดาห์</SelectItem>
                       <SelectItem value="months" className="text-base py-3 hover:bg-blue-50 focus:bg-blue-100 rounded-lg mx-1">เดือน</SelectItem>
+                      <SelectItem value="years" className="text-base py-3 hover:bg-blue-50 focus:bg-blue-100 rounded-lg mx-1">ปี</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1132,7 +1135,7 @@ export default function DynamicFormPage({ params }: { params: Promise<{ id: stri
           <div className="bg-white/90 backdrop-blur-sm shadow-2xl border border-blue-200 rounded-2xl p-8 hover:shadow-3xl transition-all duration-300">
             <div className="flex items-center gap-8">
               <div className="flex-1">
-                <h1 className="text-4xl font-black mb-3 tracking-tight bg-gradient-to-r from-blue-700 via-purple-700 to-indigo-700 bg-clip-text text-transparent leading-tight">
+                <h1 className="text-4xl font-black mb-3 tracking-tight bg-gradient-to-r from-blue-700 via-purple-700 to-indigo-700 bg-clip-text text-transparent leading-snug">
                   อาการ : {symptom.name}
                 </h1>
                 {symptom.description && (
