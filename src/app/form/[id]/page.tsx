@@ -802,7 +802,9 @@ export default function DynamicFormPage({ params }: { params: Promise<{ id: stri
                   <div className="flex items-center space-x-4 p-3 rounded-xl border-2 border-blue-100 hover:border-blue-300 hover:bg-blue-50/30 transition-all duration-300 group cursor-pointer">
                     <RadioGroupItem value={option.value} id={`${question.id}-${option.id}`} className="h-6 w-6 border-2 border-blue-400 text-blue-600 group-hover:border-blue-500" />
                     {(() => {
-                      const displayLabel = option.label?.replace(/^\{[^}]+\}/, '') || option.label
+                      let displayLabel = option.label?.replace(/^\{[^}]+\}/, '') || option.label
+                      // Remove quoted "ไม่มี" prefix for display
+                      displayLabel = displayLabel.replace(/^"ไม่มี"/, 'ไม่มี')
                       return (
                         <Label htmlFor={`${question.id}-${option.id}`} className="text-xl font-semibold leading-snug cursor-pointer flex-1 text-gray-800 group-hover:text-blue-800">
                           {displayLabel}
@@ -861,7 +863,9 @@ export default function DynamicFormPage({ params }: { params: Promise<{ id: stri
                     className="h-6 w-6 border-2 border-blue-400 text-blue-600 group-hover:border-blue-500"
                   />
                   {(() => {
-                    const displayLabel = option.label?.replace(/^\{[^}]+\}/, '') || option.label
+                    let displayLabel = option.label?.replace(/^\{[^}]+\}/, '') || option.label
+                    // Remove quoted "ไม่มี" prefix for display
+                    displayLabel = displayLabel.replace(/^"ไม่มี"/, 'ไม่มี')
                     return (
                       <Label htmlFor={`${question.id}-${option.id}`} className="text-xl font-semibold leading-snug cursor-pointer flex-1 text-gray-800 group-hover:text-blue-800">
                         {displayLabel}
@@ -923,11 +927,16 @@ export default function DynamicFormPage({ params }: { params: Promise<{ id: stri
                 <SelectValue placeholder="เลือกตัวเลือก..." />
               </SelectTrigger>
               <SelectContent className="rounded-xl border-2 border-blue-100">
-                {question.options.map((option) => (
-                  <SelectItem key={option.id} value={option.value} className="text-base py-3 hover:bg-blue-50 focus:bg-blue-100 rounded-lg mx-1">
-                    {(option.label?.replace(/^\{[^}]+\}/, '') || option.label)}
-                  </SelectItem>
-                ))}
+                {question.options.map((option) => {
+                  let displayLabel = option.label?.replace(/^\{[^}]+\}/, '') || option.label
+                  // Remove quoted "ไม่มี" prefix for display
+                  displayLabel = displayLabel.replace(/^"ไม่มี"/, 'ไม่มี')
+                  return (
+                    <SelectItem key={option.id} value={option.value} className="text-base py-3 hover:bg-blue-50 focus:bg-blue-100 rounded-lg mx-1">
+                      {displayLabel}
+                    </SelectItem>
+                  )
+                })}
               </SelectContent>
             </Select>
             
