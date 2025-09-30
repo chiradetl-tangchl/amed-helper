@@ -524,11 +524,18 @@ export default function DynamicFormPage({ params }: { params: Promise<{ id: stri
                       
                       return labelText
                     }).filter(label => {
+                      // Skip if label starts with quoted "ไม่มี" - those are explicit values we want to show
+                      if (label.startsWith('"ไม่มี"')) {
+                        return true
+                      }
                       // Filter out skip words
                       const skipWords = ['ไม่ระบุ', 'ไม่มี', 'unknown', 'none', 'n/a', 'ไม่ทราบ', 'ไม่เกี่ยวข้อง']
                       return !skipWords.some(word => 
                         label.toLowerCase().includes(word.toLowerCase())
                       )
+                    }).map(label => {
+                      // Remove quotes from "ไม่มี" prefix if present
+                      return label.replace(/^"ไม่มี"/, 'ไม่มี')
                     })
                     
                     if (labels.length === 0) return '__SKIP_TEMPLATE__'
@@ -545,6 +552,12 @@ export default function DynamicFormPage({ params }: { params: Promise<{ id: stri
                     if ((labelText.toLowerCase().includes('อื่น') || labelText.toLowerCase().includes('other')) 
                         && otherTexts[template.questionId] && otherTexts[template.questionId].trim()) {
                       labelText = otherTexts[template.questionId].trim()
+                    }
+                    
+                    // Check if the label starts with quoted "ไม่มี" - those are explicit values we want to show
+                    if (labelText.startsWith('"ไม่มี"')) {
+                      // Remove the quotes and return the value
+                      return labelText.replace(/^"ไม่มี"/, 'ไม่มี')
                     }
                     
                     // Check if the label contains skip words
